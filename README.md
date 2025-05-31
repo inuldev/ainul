@@ -6,7 +6,7 @@
 
 ### 📚 Sumber Pembelajaran
 
-Proyek ini dikembangkan berdasarkan tutorial dari **TubeGuruji** yang memberikan panduan lengkap untuk membangun Asisten Virtual AI bergaya JARVIS Anda sendiri menggunakan Tumpukan MERN (MongoDB, Express, React, Node.js).
+Proyek ini dikembangkan berdasarkan tutorial dari **Virtual Code** yang memberikan panduan lengkap untuk membangun Asisten Virtual AI bergaya JARVIS Anda sendiri menggunakan fullstack MERN (MongoDB, Express, React, Node.js).
 
 > 📺 **[Build your own AI Virtual Assistant With MERN STACK](https://www.youtube.com/watch?v=7_JwpPLyRbw)** > _oleh [VIRTUAL CODE](https://www.youtube.com/@virtual_code)_
 
