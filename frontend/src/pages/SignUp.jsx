@@ -54,7 +54,7 @@ function SignUp() {
         </h1>
         <input
           type="text"
-          placeholder="Masukkan Nama"
+          placeholder="Masukan Nama"
           className="w-full h-[60px] outline-none border-2 border-white bg-transparent text-white placeholder-gray-400 px-[20px] py-[10px] rounded-full text-[18px]"
           required
           value={name}
