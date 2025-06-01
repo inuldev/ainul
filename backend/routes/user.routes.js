@@ -5,6 +5,7 @@ import upload from "../middleware/multer.js";
 import {
   getCurrentUser,
   updateAssistant,
+  askToAssistant,
 } from "../controllers/user.controllers.js";
 
 const userRouter = express.Router();
@@ -16,5 +17,6 @@ userRouter.post(
   upload.single("assistantImage"),
   updateAssistant
 );
+userRouter.post("/asktoassistant", isAuth, askToAssistant);
 
 export default userRouter;
