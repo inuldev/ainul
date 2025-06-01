@@ -9,7 +9,7 @@ const geminiResponse = async (command, assistantName, userName) => {
     
     Your task is to understand the user's natural language input and generate a response in natural language with a JSON object like this:
     {
-      "type": "general" | "google_search" | "youtube_search" | "youtube_play" | "get_time" | "get_date" | "get_day" | "get_month" | "calculator_open" | "instagram_open" | "facebook_open" | "weather-show",
+      "type": "general" | "google-search" | "youtube-search" | "youtube-play" | "get-time" | "get-date" | "get-day" | "get-month" | "calculator-open" | "instagram-open" | "facebook-open" | "weather-show",
 
       "userInput": "<original user input>" {only remove your name from the userInput if exists} and if someone asks you to search something on Google or YouTube, then only that search text should appear in the input,
 
@@ -23,20 +23,20 @@ const geminiResponse = async (command, assistantName, userName) => {
 
     Type meanings:
     - "general": The user's input is not related to any of the other types.
-    - "google_search": The user wants to search something on Google.
-    - "youtube_search": The user wants to search something on YouTube.
-    - "youtube_play": The user wants to play a video or song on YouTube.
-    - "get_time": The user wants to know the current time.
-    - "get_date": The user wants to know the current date.
-    - "get_day": The user wants to know the current day.
-    - "get_month": The user wants to know the current month.
-    - "calculator_open": The user wants to open the calculator.
-    - "instagram_open": The user wants to open Instagram.
-    - "facebook_open": The user wants to open Facebook.
+    - "google-search": The user wants to search something on Google.
+    - "youtube-search": The user wants to search something on YouTube.
+    - "youtube-play": The user wants to play a video or song on YouTube.
+    - "get-time": The user wants to know the current time.
+    - "get-date": The user wants to know the current date.
+    - "get-day": The user wants to know the current day.
+    - "get-month": The user wants to know the current month.
+    - "calculator-open": The user wants to open the calculator.
+    - "instagram-open": The user wants to open Instagram.
+    - "facebook-open": The user wants to open Facebook.
     - "weather-show": The user wants to know the weather.
     
     Important:
-    - Use "${userName}" if someone asks who made you
+    - Use ${userName} if someone asks who made you
     - Only respond with the JSON object, nothing else.
 
     now your userInput- ${command}
