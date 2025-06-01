@@ -68,6 +68,8 @@ export const updateAssistant = async (req, res) => {
 export const askToAssistant = async (req, res) => {
   try {
     const { command } = req.body;
+    console.log("Perintah diterima:", command);
+
     const user = await User.findById(req.userId).select("-password");
 
     if (!user) {
@@ -79,25 +81,45 @@ export const askToAssistant = async (req, res) => {
 
     const userName = user.name;
     const assistantName = user.assistantName;
+    console.log(`Memproses perintah untuk ${assistantName} oleh ${userName}`);
 
     const result = await geminiResponse(command, assistantName, userName);
 
     if (!result) {
-      return res.status(400).json({
-        success: false,
-        message: "Terjadi kesalahan respon!",
+      console.error("Tidak ada respons dari Gemini");
+      return res.status(500).json({
+        type: "general",
+        userInput: command,
+        response: "Maaf, saya tidak dapat memproses permintaan Anda saat ini.",
       });
     }
 
-    const jsonMatch = result.match(/{[\s\S]*}/);
-    if (!jsonMatch) {
-      return res.status(400).json({
-        response: "Maaf, ada kesalahan respon yang tidak dipahami!",
+    console.log("Raw result dari Gemini:", result);
+
+    // Coba parse JSON dari respons
+    let aiResult;
+    try {
+      const jsonMatch = result.match(/{[\s\S]*}/);
+      if (!jsonMatch) {
+        console.error("Tidak ada JSON ditemukan dalam respons");
+        return res.status(500).json({
+          type: "general",
+          userInput: command,
+          response: "Maaf, saya tidak dapat memahami permintaan Anda.",
+        });
+      }
+
+      aiResult = JSON.parse(jsonMatch[0]);
+      console.log("Parsed AI result:", aiResult);
+    } catch (parseError) {
+      console.error("Error parsing JSON:", parseError);
+      return res.status(500).json({
+        type: "general",
+        userInput: command,
+        response: "Maaf, terjadi kesalahan dalam memproses respons.",
       });
     }
 
-    const aiResult = JSON.parse(jsonMatch[0]);
-    console.log(aiResult);
     const type = aiResult.type;
 
     switch (type) {

@@ -10,6 +10,7 @@ function Home() {
     useContext(userDataContext);
 
   const [_listening, setListening] = useState(false);
+  const [testCommand, setTestCommand] = useState("");
   const isSpeakingRef = useRef(false);
   const recognitionRef = useRef(null);
   const synth = window.speechSynthesis;
@@ -84,6 +85,25 @@ function Home() {
     }
   };
 
+  // Fungsi untuk test manual
+  const handleTestCommand = async () => {
+    if (!testCommand.trim()) return;
+
+    console.log("Testing command:", testCommand);
+    try {
+      const data = await getGeminiResponse(testCommand);
+      console.log("Test result:", data);
+      if (data) {
+        handleCommand(data);
+      } else {
+        speak("Maaf, saya tidak dapat memproses permintaan Anda.");
+      }
+    } catch (error) {
+      console.error("Error saat test:", error);
+      speak("Maaf, terjadi kesalahan.");
+    }
+  };
+
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -134,15 +154,31 @@ function Home() {
 
     recognition.onresult = async (e) => {
       const transcript = e.results[e.results.length - 1][0].transcript.trim();
+      console.log("Transcript diterima:", transcript);
+      console.log("Nama asisten:", userData.assistantName);
 
       if (
         transcript.toLowerCase().includes(userData.assistantName.toLowerCase())
       ) {
+        console.log("Nama asisten terdeteksi, memproses perintah...");
         recognition.stop();
         isRecognizingRef.current = false;
         setListening(false);
-        const data = await getGeminiResponse(transcript);
-        handleCommand(data);
+
+        try {
+          const data = await getGeminiResponse(transcript);
+          console.log("Data dari Gemini:", data);
+          if (data) {
+            handleCommand(data);
+          } else {
+            speak("Maaf, saya tidak dapat memproses permintaan Anda.");
+          }
+        } catch (error) {
+          console.error("Error saat memproses perintah:", error);
+          speak("Maaf, terjadi kesalahan.");
+        }
+      } else {
+        console.log("Nama asisten tidak terdeteksi dalam:", transcript);
       }
     };
 
@@ -160,6 +196,7 @@ function Home() {
       isRecognizingRef.current = false;
       clearInterval(fallback);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -188,6 +225,40 @@ function Home() {
       <h1 className="text-white text-[18px] font-semibold">
         {userData?.assistantName}
       </h1>
+
+      {/* Status Indicator untuk Debugging */}
+      <div className="text-white text-center mt-4">
+        <div
+          className={`inline-block w-3 h-3 rounded-full mr-2 ${
+            _listening ? "bg-green-500" : "bg-red-500"
+          }`}
+        ></div>
+        <span className="text-sm">
+          {_listening ? "Mendengarkan..." : "Tidak Mendengarkan"}
+        </span>
+      </div>
+
+      <div className="text-white text-xs text-center mt-2 opacity-70">
+        Katakan "{userData?.assistantName}" untuk memulai perintah
+      </div>
+
+      {/* Test Manual Command */}
+      <div className="mt-6 w-full max-w-md">
+        <input
+          type="text"
+          value={testCommand}
+          onChange={(e) => setTestCommand(e.target.value)}
+          placeholder="Test perintah manual..."
+          className="w-full px-4 py-2 rounded-lg text-black"
+          onKeyPress={(e) => e.key === "Enter" && handleTestCommand()}
+        />
+        <button
+          onClick={handleTestCommand}
+          className="w-full mt-2 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
+        >
+          Test Perintah
+        </button>
+      </div>
     </div>
   );
 }

@@ -3,43 +3,52 @@ import axios from "axios";
 const geminiResponse = async (command, assistantName, userName) => {
   try {
     const apiUrl = process.env.GEMINI_API_URL;
-    const prompt = `You are a virtual assistant named ${assistantName} created by ${userName}.
 
-    You are not Google Assistant or any other virtual assistant. You will now behave like a voice-enabled assistant.
-    
-    Your task is to understand the user's natural language input and generate a response in natural language with a JSON object like this:
+    if (!apiUrl) {
+      console.error("GEMINI_API_URL tidak ditemukan di environment variables");
+      return null;
+    }
+
+    console.log("Mengirim perintah ke Gemini:", command);
+
+    const prompt = `Kamu adalah asisten virtual bernama ${assistantName} yang dibuat oleh ${userName}.
+
+    Kamu bukan Google Assistant atau asisten virtual lainnya. Kamu akan berperilaku seperti asisten bersuara.
+
+    Tugasmu adalah memahami input bahasa alami pengguna dan menghasilkan respons dalam bahasa alami dengan objek JSON seperti ini:
     {
       "type": "general" | "google-search" | "youtube-search" | "youtube-play" | "get-time" | "get-date" | "get-day" | "get-month" | "calculator-open" | "instagram-open" | "facebook-open" | "weather-show",
 
-      "userInput": "<original user input>" {only remove your name from the userInput if exists} and if someone asks you to search something on Google or YouTube, then only that search text should appear in the input,
+      "userInput": "<input asli pengguna>" (hapus nama kamu dari userInput jika ada) dan jika seseorang meminta untuk mencari sesuatu di Google atau YouTube, maka hanya teks pencarian itu yang harus muncul di input,
 
-      "response": "<a short spoken response to read out loud to the user>"
+      "response": "<respons singkat yang diucapkan untuk dibacakan keras kepada pengguna>"
     }
-    
-    Instructions:
-    - "type": determine the intent of the user.
-    - "userInput": original sentence the user spoke.
-    - "response": A short voice-friendly reply, e.g. "Sure, playing it now", "Here's what I found", "Today is Tuesday", etc.
 
-    Type meanings:
-    - "general": The user's input is not related to any of the other types.
-    - "google-search": The user wants to search something on Google.
-    - "youtube-search": The user wants to search something on YouTube.
-    - "youtube-play": The user wants to play a video or song on YouTube.
-    - "get-time": The user wants to know the current time.
-    - "get-date": The user wants to know the current date.
-    - "get-day": The user wants to know the current day.
-    - "get-month": The user wants to know the current month.
-    - "calculator-open": The user wants to open the calculator.
-    - "instagram-open": The user wants to open Instagram.
-    - "facebook-open": The user wants to open Facebook.
-    - "weather-show": The user wants to know the weather.
-    
-    Important:
-    - Use ${userName} if someone asks who made you
-    - Only respond with the JSON object, nothing else.
+    Instruksi:
+    - "type": tentukan maksud pengguna.
+    - "userInput": kalimat asli yang diucapkan pengguna.
+    - "response": Balasan singkat yang ramah suara dalam bahasa Indonesia, misalnya "Baik, sedang memutar sekarang", "Ini yang saya temukan", "Hari ini hari Selasa", dll.
 
-    now your userInput- ${command}
+    Arti tipe:
+    - "general": Input pengguna tidak terkait dengan tipe lainnya.
+    - "google-search": Pengguna ingin mencari sesuatu di Google.
+    - "youtube-search": Pengguna ingin mencari sesuatu di YouTube.
+    - "youtube-play": Pengguna ingin memutar video atau lagu di YouTube.
+    - "get-time": Pengguna ingin tahu waktu saat ini.
+    - "get-date": Pengguna ingin tahu tanggal saat ini.
+    - "get-day": Pengguna ingin tahu hari saat ini.
+    - "get-month": Pengguna ingin tahu bulan saat ini.
+    - "calculator-open": Pengguna ingin membuka kalkulator.
+    - "instagram-open": Pengguna ingin membuka Instagram.
+    - "facebook-open": Pengguna ingin membuka Facebook.
+    - "weather-show": Pengguna ingin tahu cuaca.
+
+    Penting:
+    - Gunakan ${userName} jika seseorang bertanya siapa yang membuatmu
+    - Hanya respons dengan objek JSON, tidak ada yang lain.
+    - Semua respons harus dalam bahasa Indonesia.
+
+    Input pengguna sekarang: ${command}
     `;
 
     const result = await axios.post(apiUrl, {
@@ -50,10 +59,16 @@ const geminiResponse = async (command, assistantName, userName) => {
       ],
     });
 
-    return result.data.candidates[0].content.parts[0].text;
+    const responseText = result.data.candidates[0].content.parts[0].text;
+    console.log("Respons dari Gemini:", responseText);
+
+    return responseText;
   } catch (error) {
-    console.log(error);
-    return error;
+    console.error("Error di geminiResponse:", error.message);
+    if (error.response) {
+      console.error("Response error:", error.response.data);
+    }
+    return null;
   }
 };
 
