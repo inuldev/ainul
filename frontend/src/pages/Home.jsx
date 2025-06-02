@@ -75,7 +75,7 @@ function Home() {
     }
   };
 
-  // Enhanced speech recognition with debouncing
+  // Start recognition manually
   const startRecognition = useCallback(() => {
     if (!isOnline) {
       setErrorMessage(
@@ -89,6 +89,7 @@ function Home() {
         recognitionRef.current.start();
         setListening(true);
         setErrorMessage("");
+        console.log("Manual recognition start");
       }
     } catch (error) {
       if (
@@ -100,6 +101,19 @@ function Home() {
       }
     }
   }, [isOnline]);
+
+  // Stop recognition manually
+  const stopRecognition = useCallback(() => {
+    try {
+      if (recognitionRef.current && isRecognizingRef.current) {
+        recognitionRef.current.stop();
+        setListening(false);
+        console.log("Manual recognition stop");
+      }
+    } catch (error) {
+      console.error("Error stopping recognition:", error);
+    }
+  }, []);
 
   // Enhanced speech synthesis with better error handling
   const speak = useCallback(
@@ -559,17 +573,34 @@ function Home() {
 
     // Enhanced restart function with better error handling and throttling
     let restartAttempts = 0;
-    const maxRestartAttempts = 5;
+    const maxRestartAttempts = 3; // Reduced from 5 to 3
+    let lastRestartTime = 0;
+    const minRestartInterval = 5000; // Minimum 5 seconds between restarts
 
-    const restartRecognition = (delay = 1000) => {
+    const restartRecognition = (delay = 3000) => {
+      // Increased default delay
       if (!isMounted || isSpeakingRef.current || isProcessing) return;
+
+      const now = Date.now();
+      if (now - lastRestartTime < minRestartInterval) {
+        console.log("Restart throttled - too soon since last restart");
+        return;
+      }
 
       // Throttle restart attempts to prevent infinite loops
       if (restartAttempts >= maxRestartAttempts) {
-        console.log("Max restart attempts reached, stopping auto-restart");
-        setErrorMessage(
-          "Pengenalan suara dihentikan sementara. Refresh halaman jika diperlukan."
+        console.log(
+          "Max restart attempts reached, stopping auto-restart for 30 seconds"
         );
+        setErrorMessage(
+          "Pengenalan suara dihentikan sementara. Klik tombol mikrofon untuk mengaktifkan kembali."
+        );
+
+        // Reset after 30 seconds
+        setTimeout(() => {
+          restartAttempts = 0;
+          console.log("Restart attempts reset");
+        }, 30000);
         return;
       }
 
@@ -583,22 +614,23 @@ function Home() {
         ) {
           try {
             recognition.start();
-            console.log(
-              `Recognition restarted (attempt ${restartAttempts + 1})`
-            );
+            lastRestartTime = Date.now();
             restartAttempts++;
+            console.log(`Recognition restarted (attempt ${restartAttempts})`);
 
-            // Reset restart attempts after successful start
+            // Reset restart attempts after successful operation
             setTimeout(() => {
-              restartAttempts = 0;
-            }, 30000); // Reset after 30 seconds of successful operation
+              if (restartAttempts > 0) {
+                restartAttempts = Math.max(0, restartAttempts - 1);
+                console.log(`Restart attempts decreased to ${restartAttempts}`);
+              }
+            }, 15000); // Reset after 15 seconds of successful operation
           } catch (err) {
             if (err.name !== "InvalidStateError") {
               console.error("Recognition restart error:", err);
-              restartAttempts++;
               if (restartAttempts < maxRestartAttempts) {
                 // Try again with longer delay
-                restartRecognition(delay * 2);
+                restartRecognition(Math.min(delay * 1.5, 10000)); // Cap at 10 seconds
               }
             }
           }
@@ -633,9 +665,9 @@ function Home() {
       setListening(false);
       console.log("Recognition ended");
 
-      // Auto-restart if not speaking and not processing
+      // Auto-restart if not speaking and not processing, with longer delay
       if (isMounted && !isSpeakingRef.current && !isProcessing) {
-        restartRecognition(1500);
+        restartRecognition(3000); // Increased from 1500 to 3000ms
       }
     };
 
@@ -654,8 +686,8 @@ function Home() {
           setErrorMessage("Akses mikrofon ditolak");
           break;
         case "no-speech":
-          // This is normal - no speech detected, just restart quietly
-          console.log("No speech detected, restarting recognition...");
+          // This is normal - no speech detected, restart with longer delay
+          console.log("No speech detected, will restart after delay...");
           break;
         case "audio-capture":
           console.error("Recognition audio error:", event.error);
@@ -673,7 +705,9 @@ function Home() {
 
       // Restart recognition unless it's a permission error
       if (event.error !== "not-allowed" && event.error !== "audio-capture") {
-        restartRecognition(1000); // Shorter delay for better responsiveness
+        // Use longer delay for no-speech to reduce spam
+        const delay = event.error === "no-speech" ? 5000 : 2000;
+        restartRecognition(delay);
       }
     };
 
@@ -1010,14 +1044,23 @@ function Home() {
           <p className="text-white text-xs opacity-70">
             Katakan "{userData?.assistantName}" untuk memulai perintah suara
           </p>
-          {!listening && (
-            <button
-              onClick={startRecognition}
-              className="mt-2 px-3 py-1 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-xs hover:bg-blue-500/30 transition-colors"
-            >
-              🎤 Aktifkan Mikrofon
-            </button>
-          )}
+          <div className="flex gap-2 justify-center mt-2">
+            {!listening ? (
+              <button
+                onClick={startRecognition}
+                className="px-3 py-1 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-xs hover:bg-blue-500/30 transition-colors"
+              >
+                🎤 Aktifkan Mikrofon
+              </button>
+            ) : (
+              <button
+                onClick={stopRecognition}
+                className="px-3 py-1 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-xs hover:bg-red-500/30 transition-colors"
+              >
+                🔇 Matikan Mikrofon
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Compact Control Buttons */}

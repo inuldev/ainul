@@ -94,3 +94,31 @@ Sekarang aplikasi seharusnya:
 - ✅ CORS tidak error
 - ✅ Database terkoneksi
 - ✅ File upload berfungsi
+
+## 🔧 Update Terbaru (2 Juni 2025)
+
+### ✅ Masalah yang Diperbaiki:
+
+1. **Database Connection di Serverless**
+
+   - ✅ Menggunakan global caching pattern untuk Vercel
+   - ✅ Connection pooling yang optimal untuk serverless
+   - ✅ Health endpoint menunjukkan "connected"
+
+2. **CORS Configuration**
+
+   - ✅ Support multiple origins (localhost + production)
+   - ✅ Dynamic origin checking
+   - ✅ Frontend `https://ainul.vercel.app` bisa akses backend
+
+3. **Rate Limiting**
+   - ✅ Lebih fleksibel: 10 requests/15min di production
+   - ✅ Development mode: 50 requests/1min
+   - ✅ Debug endpoint untuk clear rate limits
+
+### 🧪 Test Results:
+
+- ✅ Health: `https://ainul-api.vercel.app/health` - Database connected
+- ✅ Login: Berhasil dengan response user data
+- ✅ CORS: Frontend bisa akses backend tanpa error
+- ⚠️ Rate limiting: Aktif dan berfungsi (normal behavior)
