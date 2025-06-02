@@ -12,7 +12,7 @@ if (process.env.NODE_ENV !== "production") {
 import connectDb from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
-import { generalRateLimit } from "./middleware/rateLimiter.js";
+import { generalRateLimit, clearAllRateLimits } from "./middleware/rateLimiter.js";
 import logger, { requestLogger, errorLogger } from "./middleware/logger.js";
 
 const app = express();
@@ -107,6 +107,17 @@ app.get("/health", async (req, res) => {
     });
   }
 });
+
+// Debug endpoint to clear rate limits (only in development)
+if (process.env.NODE_ENV !== "production") {
+  app.post("/debug/clear-rate-limits", (req, res) => {
+    clearAllRateLimits();
+    res.json({
+      success: true,
+      message: "All rate limits cleared",
+    });
+  });
+}
 
 // API routes
 app.use("/api/auth", authRouter);

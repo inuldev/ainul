@@ -89,9 +89,9 @@ export const assistantRateLimit = rateLimiter({
 });
 
 export const authRateLimit = rateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 login attempts per 15 minutes
-  message: "Terlalu banyak percobaan login, silakan coba lagi dalam 15 menit",
+  windowMs: process.env.NODE_ENV === "production" ? 15 * 60 * 1000 : 60 * 1000, // 15 minutes in prod, 1 minute in dev
+  maxRequests: process.env.NODE_ENV === "production" ? 10 : 50, // 10 in prod, 50 in dev
+  message: "Terlalu banyak percobaan login, silakan coba lagi sebentar",
 });
 
 export const generalRateLimit = rateLimiter({
@@ -99,5 +99,15 @@ export const generalRateLimit = rateLimiter({
   maxRequests: 100, // 100 requests per minute general
   message: "Terlalu banyak permintaan, silakan tunggu sebentar",
 });
+
+// Function to clear rate limit for specific IP (for debugging)
+export const clearRateLimit = (ip) => {
+  rateLimitStore.delete(ip);
+};
+
+// Function to clear all rate limits (for debugging)
+export const clearAllRateLimits = () => {
+  rateLimitStore.clear();
+};
 
 export default rateLimiter;
