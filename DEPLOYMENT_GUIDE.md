@@ -31,7 +31,15 @@ git push origin main
 - Set **Root Directory** ke `frontend`
 - Framework akan terdeteksi otomatis sebagai "Vite"
 
-### 3. Deploy
+### 3. Environment Variables (Optional)
+
+Tambahkan di Vercel Dashboard untuk frontend:
+
+```
+VITE_API_URL=https://ainul-backend.vercel.app
+```
+
+### 4. Deploy
 
 - Klik "Deploy"
 - Tunggu proses selesai
@@ -65,16 +73,14 @@ GEMINI_API_URL=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.
 - Klik "Deploy"
 - Catat URL backend (misal: `https://ainul-backend.vercel.app`)
 
-## 🔗 Update Frontend Config
+## 🔗 Frontend Auto-Configuration
 
-### 1. Update API URL di Frontend
+Frontend sudah dikonfigurasi untuk auto-detect environment:
 
-Edit file frontend yang menggunakan axios untuk mengganti localhost dengan URL backend Vercel.
+- **Development**: Otomatis gunakan `http://localhost:8000`
+- **Production**: Gunakan `VITE_API_URL` atau fallback ke `https://ainul-api.vercel.app`
 
-### 2. Redeploy Frontend
-
-- Push perubahan ke GitHub
-- Vercel akan auto-deploy
+Tidak perlu edit manual lagi!
 
 ## ✅ Testing
 

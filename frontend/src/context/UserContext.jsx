@@ -4,7 +4,18 @@ import { useEffect, useState } from "react";
 import { UserDataContext } from "./userDataContext.js";
 
 function UserContext({ children }) {
-  const serverUrl = "http://localhost:8000";
+  // Auto-detect environment and set appropriate server URL
+  const getServerUrl = () => {
+    // Check if we're in development mode
+    if (import.meta.env.DEV || window.location.hostname === "localhost") {
+      return "http://localhost:8000";
+    }
+
+    // Production mode - use environment variable or default to your Vercel backend
+    return import.meta.env.VITE_API_URL || "https://ainul-api.vercel.app";
+  };
+
+  const serverUrl = getServerUrl();
   const [userData, setUserData] = useState(null);
   const [frontendImage, setFrontendImage] = useState(null);
   const [backendImage, setBackendImage] = useState(null);
@@ -40,7 +51,7 @@ function UserContext({ children }) {
 
   useEffect(() => {
     handleCurrentUser();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = {
     serverUrl,
