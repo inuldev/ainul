@@ -29,8 +29,8 @@ app.use(generalRateLimit);
 // Request logging
 app.use(requestLogger);
 
-// Database connection middleware for serverless
-app.use(async (req, res, next) => {
+// Database connection middleware for serverless (only for API routes)
+app.use("/api", async (req, res, next) => {
   try {
     await connectDb();
     next();
@@ -39,6 +39,7 @@ app.use(async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: "Database connection failed",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -57,20 +58,38 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({
-    status: "OK",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development",
-    database:
-      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-    envVars: {
-      hasMongoUrl: !!process.env.MONGODB_URL,
-      hasJwtSecret: !!process.env.JWT_SECRET,
-      hasFrontendUrl: !!process.env.FRONTEND_URL,
-    },
-  });
+app.get("/health", async (req, res) => {
+  try {
+    // Try to connect to database for health check
+    await connectDb();
+
+    res.json({
+      status: "OK",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      envVars: {
+        hasMongoUrl: !!process.env.MONGODB_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasFrontendUrl: !!process.env.FRONTEND_URL,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "ERROR",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      database: "connection_failed",
+      error: error.message,
+      envVars: {
+        hasMongoUrl: !!process.env.MONGODB_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasFrontendUrl: !!process.env.FRONTEND_URL,
+      },
+    });
+  }
 });
 
 // API routes
