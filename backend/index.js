@@ -71,11 +71,20 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-app.listen(port, () => {
-  connectDb();
-  logger.info(`Server started on port ${port}`, {
-    port,
-    environment: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString(),
+// Connect to database immediately for serverless
+connectDb();
+
+// For Vercel serverless functions
+if (process.env.NODE_ENV === "production") {
+  // Export the app for Vercel
+  export default app;
+} else {
+  // Local development server
+  app.listen(port, () => {
+    logger.info(`Server started on port ${port}`, {
+      port,
+      environment: process.env.NODE_ENV || "development",
+      timestamp: new Date().toISOString(),
+    });
   });
-});
+}
