@@ -1,75 +1,219 @@
 import axios from "axios";
+import { assistantLogger } from "./middleware/logger.js";
 
-const geminiResponse = async (command, assistantName, userName) => {
+// Enhanced Gemini response with retry mechanism and better error handling
+const geminiResponse = async (
+  command,
+  assistantName,
+  userName,
+  retryCount = 0
+) => {
+  const maxRetries = 3;
+  const retryDelay = 1000 * (retryCount + 1); // Progressive delay
+  const startTime = Date.now();
+
   try {
     const apiUrl = process.env.GEMINI_API_URL;
 
     if (!apiUrl) {
       console.error("GEMINI_API_URL tidak ditemukan di environment variables");
-      return null;
+      return {
+        error: true,
+        message: "Konfigurasi API tidak ditemukan",
+        fallback: {
+          type: "general",
+          userInput: command,
+          response: "Maaf, terjadi masalah konfigurasi sistem.",
+        },
+      };
     }
 
-    console.log("Mengirim perintah ke Gemini:", command);
+    console.log(
+      `[Attempt ${retryCount + 1}] Mengirim perintah ke Gemini:`,
+      command
+    );
 
+    // Enhanced prompt with better structure and examples
     const prompt = `Kamu adalah asisten virtual bernama ${assistantName} yang dibuat oleh ${userName}.
 
-    Kamu bukan Google Assistant atau asisten virtual lainnya. Kamu akan berperilaku seperti asisten bersuara.
+PENTING: Respons HARUS berupa JSON yang valid dengan format PERSIS seperti ini:
+{
+  "type": "tipe_perintah",
+  "userInput": "input_bersih",
+  "response": "respons_suara"
+}
 
-    Tugasmu adalah memahami input bahasa alami pengguna dan menghasilkan respons dalam bahasa alami dengan objek JSON seperti ini:
-    {
-      "type": "general" | "google-search" | "youtube-search" | "youtube-play" | "get-time" | "get-date" | "get-day" | "get-month" | "calculator-open" | "instagram-open" | "facebook-open" | "weather-show",
+TIPE YANG TERSEDIA:
+- "general": Pertanyaan umum, obrolan, atau informasi yang kamu ketahui
+- "google-search": Mencari informasi di Google
+- "youtube-search": Mencari video di YouTube
+- "youtube-play": Memutar lagu/video tertentu di YouTube
+- "get-time": Menanyakan waktu saat ini
+- "get-date": Menanyakan tanggal hari ini
+- "get-day": Menanyakan hari apa sekarang
+- "get-month": Menanyakan bulan apa sekarang
+- "calculator-open": Membuka kalkulator
+- "instagram-open": Membuka Instagram
+- "facebook-open": Membuka Facebook
+- "weather-show": Menanyakan cuaca
 
-      "userInput": "<input asli pengguna>" (hapus nama kamu dari userInput jika ada) dan jika seseorang meminta untuk mencari sesuatu di Google atau YouTube, maka hanya teks pencarian itu yang harus muncul di input,
+ATURAN userInput:
+- Hapus nama asisten dari input
+- Untuk pencarian: hanya kata kunci pencarian
+- Untuk perintah lain: input asli yang sudah dibersihkan
 
-      "response": "<respons singkat yang diucapkan untuk dibacakan keras kepada pengguna>"
+ATURAN response:
+- Bahasa Indonesia yang natural
+- Singkat dan jelas untuk dibacakan
+- Sesuai dengan konteks perintah
+
+CONTOH:
+Input: "${assistantName} cari video kucing lucu"
+Output: {"type":"youtube-search","userInput":"kucing lucu","response":"Baik, saya akan mencari video kucing lucu di YouTube"}
+
+Input: "${assistantName} jam berapa sekarang"
+Output: {"type":"get-time","userInput":"jam berapa sekarang","response":"Baik, saya akan memberitahu waktu saat ini"}
+
+Input pengguna: ${command}
+
+RESPONS JSON:`;
+
+    // Configure axios with timeout and better error handling
+    const axiosConfig = {
+      timeout: 30000, // 30 second timeout
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+
+    const result = await axios.post(
+      apiUrl,
+      {
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1, // Lower temperature for more consistent responses
+          maxOutputTokens: 1024,
+        },
+      },
+      axiosConfig
+    );
+
+    const responseText = result.data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!responseText) {
+      throw new Error("Respons kosong dari Gemini API");
     }
 
-    Instruksi:
-    - "type": tentukan maksud pengguna.
-    - "userInput": kalimat asli yang diucapkan pengguna.
-    - "response": Balasan singkat yang ramah suara dalam bahasa Indonesia, misalnya "Baik, sedang memutar sekarang", "Ini yang saya temukan", "Hari ini hari Selasa", dll.
-
-    Arti tipe:
-    - "general": Input pengguna tidak terkait dengan tipe lainnya, dan jika ada yang menanyakan sesuatu yang Anda ketahui jawabannya, masukkan ke dalam kategori umum dan berikan jawaban singkat saja.
-    - "google-search": Pengguna ingin mencari sesuatu di Google.
-    - "youtube-search": Pengguna ingin mencari sesuatu di YouTube.
-    - "youtube-play": Pengguna ingin memutar video atau lagu di YouTube.
-    - "get-time": Pengguna ingin tahu waktu saat ini.
-    - "get-date": Pengguna ingin tahu tanggal saat ini.
-    - "get-day": Pengguna ingin tahu hari saat ini.
-    - "get-month": Pengguna ingin tahu bulan saat ini.
-    - "calculator-open": Pengguna ingin membuka kalkulator.
-    - "instagram-open": Pengguna ingin membuka Instagram.
-    - "facebook-open": Pengguna ingin membuka Facebook.
-    - "weather-show": Pengguna ingin tahu cuaca.
-
-    Penting:
-    - Gunakan ${userName} jika seseorang bertanya siapa yang membuatmu
-    - Hanya respons dengan objek JSON, tidak ada yang lain.
-    - Semua respons harus dalam bahasa Indonesia.
-
-    Input pengguna sekarang: ${command}
-    `;
-
-    const result = await axios.post(apiUrl, {
-      contents: [
-        {
-          parts: [{ text: prompt }],
-        },
-      ],
-    });
-
-    const responseText = result.data.candidates[0].content.parts[0].text;
-    console.log("Respons dari Gemini:", responseText);
-
+    const duration = Date.now() - startTime;
+    assistantLogger.logGeminiCall(command, true, duration, retryCount);
+    console.log("Raw Gemini response:", responseText);
     return responseText;
   } catch (error) {
-    console.error("Error di geminiResponse:", error.message);
+    const duration = Date.now() - startTime;
+    console.error(
+      `[Attempt ${retryCount + 1}] Error di geminiResponse:`,
+      error.message
+    );
+
+    // Log detailed error information
     if (error.response) {
-      console.error("Response error:", error.response.data);
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
-    return null;
+
+    // Retry logic
+    if (retryCount < maxRetries) {
+      console.log(
+        `Retrying in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      return geminiResponse(command, assistantName, userName, retryCount + 1);
+    }
+
+    // Log final failure
+    assistantLogger.logGeminiCall(command, false, duration, retryCount);
+
+    // Return structured error with fallback
+    return {
+      error: true,
+      message: error.message,
+      fallback: generateFallbackResponse(command),
+    };
   }
+};
+
+// Fallback response generator for when Gemini fails
+const generateFallbackResponse = (command) => {
+  const lowerCommand = command.toLowerCase();
+
+  // Simple pattern matching for common commands
+  if (lowerCommand.includes("waktu") || lowerCommand.includes("jam")) {
+    return {
+      type: "get-time",
+      userInput: command,
+      response: "Baik, saya akan memberitahu waktu saat ini",
+    };
+  }
+
+  if (lowerCommand.includes("tanggal")) {
+    return {
+      type: "get-date",
+      userInput: command,
+      response: "Baik, saya akan memberitahu tanggal hari ini",
+    };
+  }
+
+  if (lowerCommand.includes("hari")) {
+    return {
+      type: "get-day",
+      userInput: command,
+      response: "Baik, saya akan memberitahu hari apa sekarang",
+    };
+  }
+
+  if (lowerCommand.includes("cari") && lowerCommand.includes("google")) {
+    const searchTerm = command
+      .replace(/.*cari/i, "")
+      .replace(/di google/i, "")
+      .trim();
+    return {
+      type: "google-search",
+      userInput: searchTerm || command,
+      response: "Baik, saya akan mencari di Google",
+    };
+  }
+
+  if (lowerCommand.includes("youtube") || lowerCommand.includes("video")) {
+    const searchTerm = command
+      .replace(/.*youtube/i, "")
+      .replace(/.*video/i, "")
+      .trim();
+    return {
+      type: "youtube-search",
+      userInput: searchTerm || command,
+      response: "Baik, saya akan mencari di YouTube",
+    };
+  }
+
+  if (lowerCommand.includes("cuaca")) {
+    return {
+      type: "weather-show",
+      userInput: command,
+      response: "Baik, saya akan menampilkan informasi cuaca",
+    };
+  }
+
+  // Default fallback
+  return {
+    type: "general",
+    userInput: command,
+    response:
+      "Maaf, saya tidak dapat memproses permintaan Anda saat ini. Silakan coba lagi.",
+  };
 };
 
 export default geminiResponse;
