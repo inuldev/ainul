@@ -249,8 +249,8 @@ function Home() {
           value={testCommand}
           onChange={(e) => setTestCommand(e.target.value)}
           placeholder="Test perintah manual..."
-          className="w-full px-4 py-2 rounded-lg text-black"
-          onKeyPress={(e) => e.key === "Enter" && handleTestCommand()}
+          className="w-full px-4 py-2 rounded-lg text-white bg-[#00000060]"
+          onKeyDown={(e) => e.key === "Enter" && handleTestCommand()}
         />
         <button
           onClick={handleTestCommand}
