@@ -200,7 +200,10 @@ export const updateAssistant = async (req, res) => {
     let assistantImage;
 
     if (req.file) {
-      assistantImage = await uploadOnCloudinary(req.file.path);
+      // Handle both local file path and serverless buffer
+      const fileInput =
+        process.env.NODE_ENV === "production" ? req.file.buffer : req.file.path;
+      assistantImage = await uploadOnCloudinary(fileInput);
     } else {
       assistantImage = imageUrl;
     }

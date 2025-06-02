@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 
-// Create logs directory if it doesn't exist
+// Create logs directory if it doesn't exist (skip in production)
 const logsDir = path.join(process.cwd(), "logs");
-if (!fs.existsSync(logsDir)) {
+if (process.env.NODE_ENV !== "production" && !fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
@@ -32,6 +32,10 @@ class Logger {
   }
 
   writeToFile(filename, content) {
+    // Skip file writing in serverless environment
+    if (process.env.NODE_ENV === "production") {
+      return;
+    }
     const filePath = path.join(logsDir, filename);
     fs.appendFileSync(filePath, content);
   }

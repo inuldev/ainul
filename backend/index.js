@@ -3,7 +3,10 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
-dotenv.config();
+// Load environment variables from .env file (skip in serverless)
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
+}
 
 import connectDb from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
@@ -14,8 +17,10 @@ import logger, { requestLogger, errorLogger } from "./middleware/logger.js";
 const app = express();
 const port = process.env.PORT || 8000;
 
-// Trust proxy for accurate IP addresses
-app.set("trust proxy", 1);
+// Trust proxy for accurate IP addresses (skip in serverless)
+if (process.env.NODE_ENV !== "production") {
+  app.set("trust proxy", 1);
+}
 
 // Global rate limiting
 app.use(generalRateLimit);
@@ -60,26 +65,26 @@ app.use("*", (req, res) => {
 // Global error handler
 app.use(errorLogger);
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM received, shutting down gracefully");
-  process.exit(0);
-});
+// Graceful shutdown (skip in serverless)
+if (process.env.NODE_ENV !== "production") {
+  process.on("SIGTERM", () => {
+    logger.info("SIGTERM received, shutting down gracefully");
+    process.exit(0);
+  });
 
-process.on("SIGINT", () => {
-  logger.info("SIGINT received, shutting down gracefully");
-  process.exit(0);
-});
+  process.on("SIGINT", () => {
+    logger.info("SIGINT received, shutting down gracefully");
+    process.exit(0);
+  });
+}
 
-// Connect to database immediately for serverless
-connectDb();
+// Connect to database immediately (skip in serverless)
+if (process.env.NODE_ENV !== "production") {
+  connectDb();
+}
 
-// For Vercel serverless functions
-if (process.env.NODE_ENV === "production") {
-  // Export the app for Vercel
-  export default app;
-} else {
-  // Local development server
+// Local development server (only if not in production)
+if (process.env.NODE_ENV !== "production") {
   app.listen(port, () => {
     logger.info(`Server started on port ${port}`, {
       port,
@@ -88,3 +93,6 @@ if (process.env.NODE_ENV === "production") {
     });
   });
 }
+
+// Export the app for Vercel serverless functions
+export default app;
