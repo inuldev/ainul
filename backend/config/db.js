@@ -14,13 +14,16 @@ const connectDb = async () => {
       await mongoose.connect(process.env.MONGODB_URL, {
         bufferCommands: false, // Disable mongoose buffering
         maxPoolSize: 1, // Maintain up to 1 socket connection for serverless
+        serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+        socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+        family: 4 // Use IPv4, skip trying IPv6
       });
     }
 
     isConnected = true;
-    console.log("MongoDB connected");
+    console.log("MongoDB connected successfully");
   } catch (error) {
-    console.log("MongoDB connection error:", error);
+    console.error("MongoDB connection error:", error.message);
     isConnected = false;
 
     // Don't exit process in serverless environment
