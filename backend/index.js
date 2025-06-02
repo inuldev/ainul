@@ -29,6 +29,20 @@ app.use(generalRateLimit);
 // Request logging
 app.use(requestLogger);
 
+// Database connection middleware for serverless
+app.use(async (req, res, next) => {
+  try {
+    await connectDb();
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+    });
+  }
+});
+
 // CORS configuration
 app.use(
   cors({
@@ -87,10 +101,8 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// Connect to database immediately (skip in serverless)
-if (process.env.NODE_ENV !== "production") {
-  connectDb();
-}
+// Connect to database
+connectDb();
 
 // Local development server (only if not in production)
 if (process.env.NODE_ENV !== "production") {
