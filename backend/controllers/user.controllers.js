@@ -71,6 +71,8 @@ export const askToAssistant = async (req, res) => {
     console.log("Perintah diterima:", command);
 
     const user = await User.findById(req.userId).select("-password");
+    user.history.push(command);
+    await user.save();
 
     if (!user) {
       return res.status(404).json({

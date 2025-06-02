@@ -30,7 +30,7 @@ const geminiResponse = async (command, assistantName, userName) => {
     - "response": Balasan singkat yang ramah suara dalam bahasa Indonesia, misalnya "Baik, sedang memutar sekarang", "Ini yang saya temukan", "Hari ini hari Selasa", dll.
 
     Arti tipe:
-    - "general": Input pengguna tidak terkait dengan tipe lainnya.
+    - "general": Input pengguna tidak terkait dengan tipe lainnya, dan jika ada yang menanyakan sesuatu yang Anda ketahui jawabannya, masukkan ke dalam kategori umum dan berikan jawaban singkat saja.
     - "google-search": Pengguna ingin mencari sesuatu di Google.
     - "youtube-search": Pengguna ingin mencari sesuatu di YouTube.
     - "youtube-play": Pengguna ingin memutar video atau lagu di YouTube.
