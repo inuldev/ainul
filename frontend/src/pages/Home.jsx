@@ -22,6 +22,17 @@ function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // UI State untuk collapsible sections
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showBrowserActions, setShowBrowserActions] = useState(false);
+
+  // State untuk konfirmasi browser action
+  const [pendingBrowserAction, setPendingBrowserAction] = useState(null);
+
+  // State untuk greeting (hanya sekali per session)
+  const [hasGreeted, setHasGreeted] = useState(false);
+
   const isSpeakingRef = useRef(false);
   const isRecognizingRef = useRef(false);
   const recognitionRef = useRef(null);
@@ -120,11 +131,10 @@ function Home() {
         isSpeakingRef.current = true;
 
         utterance.onstart = () => {
-          console.log("Speech started");
+          // Speech started
         };
 
         utterance.onend = () => {
-          console.log("Speech ended");
           setAiText("");
           isSpeakingRef.current = false;
 
@@ -159,7 +169,7 @@ function Home() {
     [isProcessing, startRecognition, synth]
   );
 
-  // Enhanced command handler with better error handling and features
+  // Enhanced command handler with popup blocker workaround
   const handleCommand = useCallback(
     (data) => {
       if (!data) {
@@ -167,84 +177,184 @@ function Home() {
         return;
       }
 
-      const { type, userInput, response, weatherData, warning } = data;
+      const { type, userInput, response, warning } = data;
 
       // Show warning if using fallback mode
       if (warning) {
-        console.warn("Using fallback mode:", warning);
+        // Using fallback mode
       }
 
       // Speak the response
       speak(response, true);
 
       try {
+        // Workaround untuk popup blocker: buka tab kosong dulu
+        let newTab = null;
+        const needsNewTab = [
+          "google-search",
+          "youtube-search",
+          "youtube-play",
+          "calculator-open",
+          "instagram-open",
+          "facebook-open",
+          "weather-show",
+        ].includes(type);
+
+        if (needsNewTab) {
+          try {
+            // Coba buka tab baru terlebih dahulu
+            newTab = window.open("about:blank", "_blank");
+            if (!newTab) {
+              throw new Error("Popup blocked");
+            }
+          } catch {
+            // Popup blocked, using same tab
+            newTab = null;
+          }
+        }
+
         switch (type) {
-          case "google-search":
-            if (userInput && userInput.trim()) {
-              const query = encodeURIComponent(userInput.trim());
-              window.open(`https://www.google.com/search?q=${query}`, "_blank");
+          case "google-search": {
+            const googleUrl =
+              userInput && userInput.trim()
+                ? `https://www.google.com/search?q=${encodeURIComponent(
+                    userInput.trim()
+                  )}`
+                : `https://www.google.com/`;
+
+            if (newTab) {
+              newTab.location.href = googleUrl;
+              speak("Membuka Google di tab baru.");
             } else {
-              window.open(`https://www.google.com/`, "_blank");
+              // Jika popup diblokir, tawarkan pilihan
+              setPendingBrowserAction({
+                type: "google-search",
+                url: googleUrl,
+                message: "Google",
+              });
+              speak(
+                "Browser memblokir popup. Apakah Anda ingin membuka Google di tab ini? Katakan ya atau tidak."
+              );
+              setErrorMessage(
+                "Popup diblokir - Katakan 'ya' untuk buka di tab ini, atau gunakan tombol manual"
+              );
+              setShowBrowserActions(true);
             }
             break;
+          }
 
-          case "youtube-search":
-            if (userInput && userInput.trim()) {
-              const query = encodeURIComponent(userInput.trim());
-              window.open(
-                `https://www.youtube.com/results?search_query=${query}`,
-                "_blank"
-              );
+          case "youtube-search": {
+            const youtubeSearchUrl =
+              userInput && userInput.trim()
+                ? `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                    userInput.trim()
+                  )}`
+                : `https://www.youtube.com/`;
+
+            if (newTab) {
+              newTab.location.href = youtubeSearchUrl;
             } else {
-              window.open(`https://www.youtube.com/`, "_blank");
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk membuka YouTube."
+              );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
             }
             break;
+          }
 
-          case "youtube-play":
-            if (userInput && userInput.trim()) {
-              const query = encodeURIComponent(userInput.trim());
-              // Try to find and play the first video
-              window.open(
-                `https://www.youtube.com/results?search_query=${query}&sp=EgIQAQ%253D%253D`,
-                "_blank"
-              );
+          case "youtube-play": {
+            const youtubePlayUrl =
+              userInput && userInput.trim()
+                ? `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                    userInput.trim()
+                  )}&sp=EgIQAQ%253D%253D`
+                : `https://www.youtube.com/`;
+
+            if (newTab) {
+              newTab.location.href = youtubePlayUrl;
             } else {
-              window.open(`https://www.youtube.com/`, "_blank");
-            }
-            break;
-
-          case "calculator-open":
-            // Try to open system calculator, fallback to web calculator
-            try {
-              window.open(`calculator://`, "_self");
-            } catch {
-              window.open(
-                `https://www.google.com/search?q=calculator`,
-                "_blank"
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk membuka YouTube."
               );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
             }
             break;
+          }
 
-          case "instagram-open":
-            window.open(`https://www.instagram.com/`, "_blank");
-            break;
-
-          case "facebook-open":
-            window.open(`https://www.facebook.com/`, "_blank");
-            break;
-
-          case "weather-show":
-            if (weatherData) {
-              // Display weather data in a more interactive way
-              console.log("Weather data:", weatherData);
-              // You could create a modal or overlay to show detailed weather
+          case "calculator-open": {
+            // Try system calculator first, fallback to web
+            const calcUrl = `https://www.google.com/search?q=calculator`;
+            if (newTab) {
+              try {
+                newTab.location.href = `calculator://`;
+              } catch {
+                newTab.location.href = calcUrl;
+              }
+            } else {
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk membuka kalkulator."
+              );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
             }
-            // Always open weather search as backup
-            window.open(
-              `https://www.google.com/search?q=cuaca+jakarta`,
-              "_blank"
-            );
             break;
+          }
+
+          case "instagram-open": {
+            const instagramUrl = `https://www.instagram.com/`;
+            if (newTab) {
+              newTab.location.href = instagramUrl;
+            } else {
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk membuka Instagram."
+              );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
+            }
+            break;
+          }
+
+          case "facebook-open": {
+            const facebookUrl = `https://www.facebook.com/`;
+            if (newTab) {
+              newTab.location.href = facebookUrl;
+            } else {
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk membuka Facebook."
+              );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
+            }
+            break;
+          }
+
+          case "weather-show": {
+            const weatherUrl = `https://www.google.com/search?q=cuaca+jakarta`;
+            if (newTab) {
+              newTab.location.href = weatherUrl;
+            } else {
+              speak(
+                "Browser memblokir popup. Silakan gunakan tombol manual di bawah untuk melihat cuaca."
+              );
+              setErrorMessage(
+                "Popup diblokir - gunakan tombol 'Buka Website' di bawah"
+              );
+              setShowBrowserActions(true); // Auto-expand browser actions
+            }
+            break;
+          }
 
           case "get-time":
           case "get-date":
@@ -255,12 +365,29 @@ function Home() {
             break;
 
           default:
-            console.warn("Unknown command type:", type);
+            // Close unused tab if opened
+            if (newTab) {
+              newTab.close();
+            }
             break;
+        }
+
+        // Show success message for browser actions
+        if (needsNewTab) {
+          setErrorMessage("");
         }
       } catch (error) {
         console.error("Error executing command:", error);
-        setErrorMessage("Gagal menjalankan perintah");
+        setErrorMessage(
+          "Gagal menjalankan perintah - pastikan popup tidak diblokir browser"
+        );
+
+        // Show user-friendly popup blocker message
+        if (error.message.includes("Popup blocked")) {
+          speak(
+            "Maaf, browser memblokir popup. Silakan izinkan popup untuk situs ini atau gunakan tombol manual."
+          );
+        }
       }
     },
     [speak]
@@ -282,16 +409,14 @@ function Home() {
     setUserText(command);
     setAiText("");
 
-    console.log("Testing command:", command);
-
     try {
       const data = await getGeminiResponse(command);
-      console.log("Test result:", data);
 
       if (data) {
         handleCommand(data);
         setAiText(data.response);
         setTestCommand(""); // Clear input after successful command
+        setShowManualInput(false); // Auto-collapse after successful command
       } else {
         const errorMsg = "Maaf, saya tidak dapat memproses permintaan Anda.";
         speak(errorMsg);
@@ -309,6 +434,37 @@ function Home() {
       setUserText("");
     }
   };
+
+  // Auto-expand manual input when user starts typing
+  const handleInputChange = (e) => {
+    setTestCommand(e.target.value);
+    if (e.target.value.length > 0 && !showManualInput) {
+      setShowManualInput(true);
+    }
+  };
+
+  // Handle quick action clicks
+  const handleQuickAction = (command) => {
+    setTestCommand(command);
+    setShowManualInput(true); // Show manual input when quick action is used
+    setShowQuickActions(false); // Auto-collapse quick actions
+  };
+
+  // Handle browser action confirmation
+  const handleBrowserConfirmation = useCallback(
+    (confirmed) => {
+      if (pendingBrowserAction && confirmed) {
+        window.location.href = pendingBrowserAction.url;
+      } else if (pendingBrowserAction && !confirmed) {
+        speak(
+          `Baik, ${pendingBrowserAction.message} tidak dibuka. Anda bisa menggunakan tombol manual jika diperlukan.`
+        );
+      }
+      setPendingBrowserAction(null);
+      setErrorMessage("");
+    },
+    [pendingBrowserAction, speak]
+  );
 
   // Enhanced command processing with debouncing and retry
   const processVoiceCommand = useCallback(
@@ -401,9 +557,21 @@ function Home() {
     let isMounted = true;
     let restartTimeout;
 
-    // Enhanced restart function with better error handling
+    // Enhanced restart function with better error handling and throttling
+    let restartAttempts = 0;
+    const maxRestartAttempts = 5;
+
     const restartRecognition = (delay = 1000) => {
       if (!isMounted || isSpeakingRef.current || isProcessing) return;
+
+      // Throttle restart attempts to prevent infinite loops
+      if (restartAttempts >= maxRestartAttempts) {
+        console.log("Max restart attempts reached, stopping auto-restart");
+        setErrorMessage(
+          "Pengenalan suara dihentikan sementara. Refresh halaman jika diperlukan."
+        );
+        return;
+      }
 
       clearTimeout(restartTimeout);
       restartTimeout = setTimeout(() => {
@@ -415,11 +583,23 @@ function Home() {
         ) {
           try {
             recognition.start();
-            console.log("Recognition restarted");
+            console.log(
+              `Recognition restarted (attempt ${restartAttempts + 1})`
+            );
+            restartAttempts++;
+
+            // Reset restart attempts after successful start
+            setTimeout(() => {
+              restartAttempts = 0;
+            }, 30000); // Reset after 30 seconds of successful operation
           } catch (err) {
             if (err.name !== "InvalidStateError") {
               console.error("Recognition restart error:", err);
-              setErrorMessage("Gagal memulai ulang pengenalan suara");
+              restartAttempts++;
+              if (restartAttempts < maxRestartAttempts) {
+                // Try again with longer delay
+                restartRecognition(delay * 2);
+              }
             }
           }
         }
@@ -460,34 +640,40 @@ function Home() {
     };
 
     recognition.onerror = (event) => {
-      console.error("Recognition error:", event.error);
       isRecognizingRef.current = false;
       setListening(false);
 
       // Handle different error types
       switch (event.error) {
         case "network":
+          console.error("Recognition network error:", event.error);
           setErrorMessage("Kesalahan jaringan saat pengenalan suara");
           break;
         case "not-allowed":
+          console.error("Recognition permission error:", event.error);
           setErrorMessage("Akses mikrofon ditolak");
           break;
         case "no-speech":
-          // This is normal, just restart
+          // This is normal - no speech detected, just restart quietly
+          console.log("No speech detected, restarting recognition...");
           break;
         case "audio-capture":
+          console.error("Recognition audio error:", event.error);
           setErrorMessage("Tidak dapat mengakses mikrofon");
           break;
+        case "aborted":
+          // This is normal when recognition is stopped intentionally
+          console.log("Recognition aborted (normal)");
+          break;
         default:
-          if (event.error !== "aborted") {
-            setErrorMessage(`Kesalahan pengenalan suara: ${event.error}`);
-          }
+          console.error("Recognition error:", event.error);
+          setErrorMessage(`Kesalahan pengenalan suara: ${event.error}`);
           break;
       }
 
       // Restart recognition unless it's a permission error
       if (event.error !== "not-allowed" && event.error !== "audio-capture") {
-        restartRecognition(2000);
+        restartRecognition(1000); // Shorter delay for better responsiveness
       }
     };
 
@@ -504,6 +690,28 @@ function Home() {
       if (confidence < 0.5) {
         console.log("Low confidence, ignoring transcript");
         return;
+      }
+
+      // Check for browser action confirmation first
+      if (pendingBrowserAction) {
+        const lowerTranscript = transcript.toLowerCase();
+        if (
+          lowerTranscript.includes("ya") ||
+          lowerTranscript.includes("iya") ||
+          lowerTranscript.includes("yes")
+        ) {
+          console.log("User confirmed browser action");
+          handleBrowserConfirmation(true);
+          return;
+        } else if (
+          lowerTranscript.includes("tidak") ||
+          lowerTranscript.includes("no") ||
+          lowerTranscript.includes("batal")
+        ) {
+          console.log("User declined browser action");
+          handleBrowserConfirmation(false);
+          return;
+        }
       }
 
       // Check if assistant name is mentioned
@@ -524,24 +732,40 @@ function Home() {
       }
     };
 
-    // Enhanced greeting with error handling
-    try {
-      const greeting = new SpeechSynthesisUtterance(
-        `Halo ${userData.name}, apa yang bisa saya bantu?`
-      );
-      greeting.lang = "id-ID";
-      greeting.rate = 0.9;
-      greeting.onend = () => {
-        // Start listening after greeting
+    // Enhanced greeting with error handling (only once per session)
+    if (!hasGreeted) {
+      try {
+        const greeting = new SpeechSynthesisUtterance(
+          `Halo ${userData.name}, apa yang bisa saya bantu?`
+        );
+        greeting.lang = "id-ID";
+        greeting.rate = 0.9;
+        greeting.onend = () => {
+          // Start listening after greeting
+          setTimeout(() => {
+            if (isMounted && !isRecognizingRef.current) {
+              startRecognition();
+            }
+          }, 1000);
+        };
+        window.speechSynthesis.speak(greeting);
+        setHasGreeted(true); // Mark as greeted
+      } catch (error) {
+        console.error("Greeting speech error:", error);
+        // Start listening even if greeting fails
         setTimeout(() => {
           if (isMounted && !isRecognizingRef.current) {
             startRecognition();
           }
         }, 1000);
-      };
-      window.speechSynthesis.speak(greeting);
-    } catch (error) {
-      console.error("Greeting speech error:", error);
+      }
+    } else {
+      // Skip greeting, start listening directly
+      setTimeout(() => {
+        if (isMounted && !isRecognizingRef.current) {
+          startRecognition();
+        }
+      }, 1000);
     }
 
     // Cleanup function
@@ -566,16 +790,66 @@ function Home() {
     isProcessing,
     processVoiceCommand,
     startRecognition,
+    hasGreeted,
+    handleBrowserConfirmation,
+    pendingBrowserAction,
   ]);
 
   return (
-    <div className="w-full h-[100vh] bg-gradient-to-t from-[#000000] to-[#02023d] flex justify-center items-center flex-col gap-[15px] relative overflow-hidden">
-      <CgMenuRight
-        className="lg:hidden text-white absolute top-[20px] right-[20px] w-[25px] h-[25px] cursor-pointer"
-        onClick={() => setHam(true)}
-      />
+    <div className="w-full h-[100vh] bg-gradient-to-t from-[#000000] to-[#02023d] flex flex-col relative overflow-hidden">
+      {/* Header dengan Menu */}
+      <div className="flex justify-between items-center p-4 z-10">
+        <div className="text-white text-lg font-semibold">AI Assistant</div>
+        <div className="flex items-center gap-3">
+          {/* Status Indicators - Compact */}
+          <div className="hidden lg:flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isOnline ? "bg-green-500" : "bg-red-500"
+                }`}
+              ></div>
+              <span className="text-xs text-gray-300">
+                {isOnline ? "Online" : "Offline"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  listening ? "bg-blue-500 animate-pulse" : "bg-gray-500"
+                }`}
+              ></div>
+              <span className="text-xs text-gray-300">
+                {listening ? "Listening" : "Standby"}
+              </span>
+            </div>
+          </div>
+
+          {/* Desktop Buttons */}
+          <button
+            className="hidden lg:block px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+            onClick={() => navigate("/customize")}
+          >
+            Pilih Asisten
+          </button>
+          <button
+            className="hidden lg:block px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+            onClick={handleLogOut}
+          >
+            Logout
+          </button>
+
+          {/* Mobile Menu Button */}
+          <CgMenuRight
+            className="lg:hidden text-white w-6 h-6 cursor-pointer"
+            onClick={() => setHam(true)}
+          />
+        </div>
+      </div>
+
+      {/* Mobile Sidebar */}
       <div
-        className={`absolute lg:hidden top-0 w-full h-full bg-[#00000053] backdrop-blur-lg p-[20px] gap-[20px] flex flex-col items-start cursor-pointer ${
+        className={`absolute lg:hidden top-0 w-full h-full bg-[#00000053] backdrop-blur-lg p-[20px] gap-[20px] flex flex-col items-start cursor-pointer z-50 ${
           ham ? "translate-x-0" : "translate-x-full"
         } transition-transform duration-300 ease-in-out`}
       >
@@ -606,9 +880,15 @@ function Home() {
               className="text-gray-200 text-[14px] p-2 bg-gray-800/30 rounded"
             >
               <div className="truncate">
-                {typeof his === "string" ? his : his.command || his}
+                {typeof his === "string"
+                  ? his
+                  : his && typeof his === "object" && his.command
+                  ? his.command
+                  : his && typeof his === "object"
+                  ? JSON.stringify(his)
+                  : "Perintah tidak valid"}
               </div>
-              {his.timestamp && (
+              {his && typeof his === "object" && his.timestamp && (
                 <div className="text-xs text-gray-400 mt-1">
                   {new Date(his.timestamp).toLocaleString("id-ID")}
                 </div>
@@ -622,71 +902,69 @@ function Home() {
           )}
         </div>
       </div>
-      <button
-        type="submit"
-        className="min-w-[150px] h-[50px] mt-[30px] absolute hidden lg:block top-[20px] right-[20px] bg-blue-400 text-white font-semibold rounded-full text-[18px] hover:bg-blue-500 transition-colors cursor-pointer"
-        onClick={handleLogOut}
-      >
-        Log Out
-      </button>
-      <button
-        type="submit"
-        className="min-w-[150px] h-[50px] mt-[30px] absolute hidden lg:block top-[100px] right-[20px] bg-blue-400 text-white font-semibold rounded-full text-[18px] px-[20px] py-[10px] hover:bg-blue-500 transition-colors cursor-pointer"
-        onClick={() => navigate("/customize")}
-      >
-        Pilih Asisten Virtual
-      </button>
-      <div className="w-[150px] h-[220px] flex justify-center items-center overflow-hidden rounded-4xl shadow-lg">
-        <img
-          src={userData?.assistantImage}
-          alt=""
-          className="h-full object-cover"
-        />
-      </div>
-      <h1 className="text-white text-[18px] font-semibold">
-        {userData?.assistantName}
-      </h1>
-      {!aiText && <img src={userImg} alt="" className="w-[100px]" />}
-      {aiText && <img src={aiImg} alt="" className="w-[100px]" />}
-      <h1 className="text-white text-[16px] font-semibold text-wrap">
-        {userText ? userText : aiText ? aiText : null}
-      </h1>
 
-      {/* Enhanced Status Indicators */}
-      <div className="text-white text-center mt-4 space-y-2">
-        {/* Connection Status */}
-        <div className="flex items-center justify-center space-x-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              isOnline ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></div>
-          <span className="text-sm">{isOnline ? "Online" : "Offline"}</span>
-        </div>
-
-        {/* Listening Status */}
-        <div className="flex items-center justify-center space-x-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              listening ? "bg-blue-500 animate-pulse" : "bg-gray-500"
-            }`}
-          ></div>
-          <span className="text-sm">
-            {listening ? "Mendengarkan..." : "Standby"}
-          </span>
-        </div>
-
-        {/* Processing Status */}
-        {isProcessing && (
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500 animate-spin"></div>
-            <span className="text-sm">Memproses...</span>
+      {/* Main Content Area - Scrollable */}
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pb-4 overflow-y-auto">
+        {/* Assistant Avatar Section - Fixed at top */}
+        <div className="flex flex-col items-center mb-6 mt-4">
+          <div className="w-32 h-40 lg:w-36 lg:h-44 flex justify-center items-center overflow-hidden rounded-3xl shadow-lg mb-3">
+            <img
+              src={userData?.assistantImage}
+              alt=""
+              className="h-full object-cover"
+            />
           </div>
-        )}
+          <h1 className="text-white text-lg font-semibold mb-2">
+            {userData?.assistantName}
+          </h1>
+
+          {/* Conversation Icons */}
+          <div className="flex items-center gap-3 mb-3">
+            {!aiText && <img src={userImg} alt="" className="w-16 h-16" />}
+            {aiText && <img src={aiImg} alt="" className="w-16 h-16" />}
+          </div>
+
+          {/* Conversation Text */}
+          {(userText || aiText) && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 max-w-sm text-center">
+              <p className="text-white text-sm">{userText || aiText}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Status Indicators */}
+        <div className="lg:hidden flex justify-center gap-4 mb-4">
+          <div className="flex items-center gap-1">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isOnline ? "bg-green-500" : "bg-red-500"
+              }`}
+            ></div>
+            <span className="text-xs text-gray-300">
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                listening ? "bg-blue-500 animate-pulse" : "bg-gray-500"
+              }`}
+            ></div>
+            <span className="text-xs text-gray-300">
+              {listening ? "Listening" : "Standby"}
+            </span>
+          </div>
+          {isProcessing && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 animate-spin"></div>
+              <span className="text-xs text-gray-300">Processing</span>
+            </div>
+          )}
+        </div>
 
         {/* Error Message Display */}
         {errorMessage && (
-          <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 mt-2 max-w-md">
+          <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 mb-4 max-w-sm">
             <div className="flex items-center justify-between">
               <span className="text-red-300 text-sm">{errorMessage}</span>
               <button
@@ -698,70 +976,227 @@ function Home() {
             </div>
           </div>
         )}
-      </div>
 
-      <div className="text-white text-xs text-center mt-2 opacity-70">
-        Katakan "{userData?.assistantName}" untuk memulai perintah suara
-      </div>
+        {/* Browser Action Confirmation Dialog */}
+        {pendingBrowserAction && (
+          <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4 mb-4 max-w-sm animate-fadeIn">
+            <div className="text-center space-y-3">
+              <p className="text-blue-300 text-sm">
+                Buka {pendingBrowserAction.message} di tab ini?
+              </p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => handleBrowserConfirmation(true)}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors"
+                >
+                  Ya, Buka
+                </button>
+                <button
+                  onClick={() => handleBrowserConfirmation(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
+                >
+                  Tidak
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                Atau katakan "ya" / "tidak" dengan suara
+              </p>
+            </div>
+          </div>
+        )}
 
-      {/* Enhanced Manual Command Interface */}
-      <div className="mt-4 w-full max-w-md space-y-2">
-        <input
-          type="text"
-          value={testCommand}
-          onChange={(e) => setTestCommand(e.target.value)}
-          placeholder="Ketik perintah manual..."
-          className="w-full px-4 py-3 rounded-lg text-white bg-[#00000060] border border-gray-600 focus:border-blue-500 focus:outline-none transition-colors"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !isProcessing) {
-              handleTestCommand();
-            }
-          }}
-          disabled={isProcessing || !isOnline}
-        />
-        <button
-          onClick={handleTestCommand}
-          disabled={isProcessing || !testCommand.trim() || !isOnline}
-          className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
-            isProcessing || !testCommand.trim() || !isOnline
-              ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-              : "bg-green-500 text-white hover:bg-green-600 active:scale-95"
-          }`}
-        >
-          {isProcessing ? "Memproses..." : "Kirim Perintah"}
-        </button>
-      </div>
+        {/* Voice Command Hint */}
+        <div className="text-center mb-6">
+          <p className="text-white text-xs opacity-70">
+            Katakan "{userData?.assistantName}" untuk memulai perintah suara
+          </p>
+          {!listening && (
+            <button
+              onClick={startRecognition}
+              className="mt-2 px-3 py-1 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-xs hover:bg-blue-500/30 transition-colors"
+            >
+              🎤 Aktifkan Mikrofon
+            </button>
+          )}
+        </div>
 
-      {/* Quick Action Buttons */}
-      <div className="mt-4 grid grid-cols-2 gap-2 w-full max-w-md">
-        <button
-          onClick={() => setTestCommand("jam berapa sekarang")}
-          disabled={isProcessing}
-          className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-        >
-          Jam Berapa?
-        </button>
-        <button
-          onClick={() => setTestCommand("tanggal hari ini")}
-          disabled={isProcessing}
-          className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-        >
-          Tanggal Hari Ini
-        </button>
-        <button
-          onClick={() => setTestCommand("cuaca hari ini")}
-          disabled={isProcessing}
-          className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-        >
-          Cek Cuaca
-        </button>
-        <button
-          onClick={() => setTestCommand("cari di google teknologi AI")}
-          disabled={isProcessing}
-          className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-        >
-          Cari Google
-        </button>
+        {/* Compact Control Buttons */}
+        <div className="w-full max-w-sm space-y-3">
+          {/* Manual Input Toggle */}
+          <button
+            onClick={() => setShowManualInput(!showManualInput)}
+            className="w-full py-2 px-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white text-sm hover:bg-white/20 transition-all duration-200 flex items-center justify-between"
+          >
+            <span>💬 Input Manual</span>
+            <span
+              className={`transform transition-transform ${
+                showManualInput ? "rotate-180" : ""
+              }`}
+            >
+              ▼
+            </span>
+          </button>
+
+          {/* Manual Input Section - Collapsible */}
+          {showManualInput && (
+            <div className="space-y-2 animate-fadeIn">
+              <input
+                type="text"
+                value={testCommand}
+                onChange={handleInputChange}
+                placeholder="Ketik perintah manual..."
+                className="w-full px-4 py-3 rounded-lg text-white bg-[#00000060] border border-gray-600 focus:border-blue-500 focus:outline-none transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isProcessing) {
+                    handleTestCommand();
+                  }
+                }}
+                disabled={isProcessing || !isOnline}
+                autoFocus={showManualInput}
+              />
+              <button
+                onClick={handleTestCommand}
+                disabled={isProcessing || !testCommand.trim() || !isOnline}
+                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
+                  isProcessing || !testCommand.trim() || !isOnline
+                    ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                    : "bg-green-500 text-white hover:bg-green-600 active:scale-95"
+                }`}
+              >
+                {isProcessing ? "Memproses..." : "Kirim Perintah"}
+              </button>
+            </div>
+          )}
+
+          {/* Quick Actions Toggle */}
+          <button
+            onClick={() => setShowQuickActions(!showQuickActions)}
+            className="w-full py-2 px-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white text-sm hover:bg-white/20 transition-all duration-200 flex items-center justify-between"
+          >
+            <span>⚡ Aksi Cepat</span>
+            <span
+              className={`transform transition-transform ${
+                showQuickActions ? "rotate-180" : ""
+              }`}
+            >
+              ▼
+            </span>
+          </button>
+
+          {/* Quick Actions Section - Collapsible */}
+          {showQuickActions && (
+            <div className="grid grid-cols-2 gap-2 animate-fadeIn">
+              <button
+                onClick={() => handleQuickAction("jam berapa sekarang")}
+                disabled={isProcessing}
+                className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                🕐 Jam
+              </button>
+              <button
+                onClick={() => handleQuickAction("tanggal hari ini")}
+                disabled={isProcessing}
+                className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                📅 Tanggal
+              </button>
+              <button
+                onClick={() => handleQuickAction("cuaca hari ini")}
+                disabled={isProcessing}
+                className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                🌤️ Cuaca
+              </button>
+              <button
+                onClick={() => handleQuickAction("cari di google teknologi AI")}
+                disabled={isProcessing}
+                className="px-3 py-2 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-300 text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                🔍 Google
+              </button>
+            </div>
+          )}
+
+          {/* Browser Actions Toggle */}
+          <button
+            onClick={() => setShowBrowserActions(!showBrowserActions)}
+            className="w-full py-2 px-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white text-sm hover:bg-white/20 transition-all duration-200 flex items-center justify-between"
+          >
+            <span>🌐 Buka Website</span>
+            <span
+              className={`transform transition-transform ${
+                showBrowserActions ? "rotate-180" : ""
+              }`}
+            >
+              ▼
+            </span>
+          </button>
+
+          {/* Browser Actions Section - Collapsible */}
+          {showBrowserActions && (
+            <div className="space-y-3 animate-fadeIn">
+              <p className="text-xs text-gray-400 text-center">
+                Jika perintah suara tidak bisa buka browser:
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() =>
+                    window.open("https://www.google.com/", "_blank")
+                  }
+                  className="p-2 bg-gray-600/50 border border-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-xs"
+                >
+                  🔍 Google
+                </button>
+                <button
+                  onClick={() =>
+                    window.open("https://www.youtube.com/", "_blank")
+                  }
+                  className="p-2 bg-red-600/50 border border-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs"
+                >
+                  📺 YouTube
+                </button>
+                <button
+                  onClick={() =>
+                    window.open("https://www.instagram.com/", "_blank")
+                  }
+                  className="p-2 bg-pink-600/50 border border-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-xs"
+                >
+                  📷 Instagram
+                </button>
+                <button
+                  onClick={() =>
+                    window.open("https://www.facebook.com/", "_blank")
+                  }
+                  className="p-2 bg-blue-600/50 border border-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs"
+                >
+                  📘 Facebook
+                </button>
+                <button
+                  onClick={() =>
+                    window.open(
+                      "https://www.google.com/search?q=calculator",
+                      "_blank"
+                    )
+                  }
+                  className="p-2 bg-green-600/50 border border-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-xs"
+                >
+                  🧮 Kalkulator
+                </button>
+                <button
+                  onClick={() =>
+                    window.open(
+                      "https://www.google.com/search?q=cuaca+jakarta",
+                      "_blank"
+                    )
+                  }
+                  className="p-2 bg-cyan-600/50 border border-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors text-xs"
+                >
+                  🌤️ Cuaca
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

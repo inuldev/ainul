@@ -8,9 +8,8 @@ dotenv.config();
 import connectDb from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
-import { requestLogger, errorLogger } from "./middleware/logger.js";
 import { generalRateLimit } from "./middleware/rateLimiter.js";
-import logger from "./middleware/logger.js";
+import logger, { requestLogger, errorLogger } from "./middleware/logger.js";
 
 const app = express();
 const port = process.env.PORT || 8000;
