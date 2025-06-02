@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import mongoose from "mongoose";
 
 // Load environment variables from .env file (skip in serverless)
 if (process.env.NODE_ENV !== "production") {
@@ -47,6 +48,14 @@ app.get("/health", (req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+    database:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    envVars: {
+      hasMongoUrl: !!process.env.MONGODB_URL,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      hasFrontendUrl: !!process.env.FRONTEND_URL,
+    },
   });
 });
 

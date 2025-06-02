@@ -3,9 +3,25 @@ import bcrypt from "bcryptjs";
 import genToken from "../config/token.js";
 import User from "../models/user.model.js";
 
+// Helper function for consistent cookie options
+const getCookieOptions = () => ({
+  httpOnly: true,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+  secure: process.env.NODE_ENV === "production", // true for HTTPS
+});
+
 export const signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    // Validate input
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Nama, email, dan password harus diisi!",
+      });
+    }
 
     const existEmail = await User.findOne({ email });
     if (existEmail) {
@@ -32,12 +48,7 @@ export const signup = async (req, res) => {
 
     const token = await genToken(user._id);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: "strict",
-      secure: false,
-    });
+    res.cookie("token", token, getCookieOptions());
 
     return res.status(201).json({
       success: true,
@@ -45,10 +56,11 @@ export const signup = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Signup error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Terjadi kesalahan server saat registrasi",
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 };
@@ -56,6 +68,14 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email dan password harus diisi!",
+      });
+    }
 
     const user = await User.findOne({ email });
 
@@ -77,12 +97,7 @@ export const login = async (req, res) => {
 
     const token = await genToken(user._id);
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: "strict",
-      secure: false,
-    });
+    res.cookie("token", token, getCookieOptions());
 
     return res.status(201).json({
       success: true,
@@ -90,17 +105,20 @@ export const login = async (req, res) => {
       user,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Terjadi kesalahan server saat login",
+      ...(process.env.NODE_ENV === "development" && { error: error.message }),
     });
   }
 };
 
 export const logout = async (req, res) => {
   try {
-    res.clearCookie("token");
+    // Clear cookie with same options as when it was set
+    const { maxAge, ...clearOptions } = getCookieOptions();
+    res.clearCookie("token", clearOptions);
 
     return res.status(200).json({
       success: true,
