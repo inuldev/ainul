@@ -7,10 +7,10 @@ import SignUp from "./pages/SignUp";
 import Customize from "./pages/Customize";
 import Customize2 from "./pages/Customize2";
 
-import { userDataContext } from "./context/UserContext";
+import { UserDataContext } from "./context/userDataContext.js";
 
 function App() {
-  const { userData } = useContext(userDataContext);
+  const { userData } = useContext(UserDataContext);
 
   return (
     <Routes>

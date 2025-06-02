@@ -4,11 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 
 import bg from "../assets/authBg.png";
-import { userDataContext } from "../context/UserContext";
+import { UserDataContext } from "../context/userDataContext.js";
 
 function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
-  const { serverUrl, setUserData } = useContext(userDataContext);
+  const { serverUrl, setUserData } = useContext(UserDataContext);
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

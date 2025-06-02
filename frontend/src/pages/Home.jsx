@@ -6,12 +6,12 @@ import { useContext, useEffect, useRef, useState, useCallback } from "react";
 
 import aiImg from "../assets/ai.gif";
 import userImg from "../assets/user.gif";
-import { userDataContext } from "../context/UserContext";
+import { UserDataContext } from "../context/userDataContext.js";
 
 function Home() {
   const navigate = useNavigate();
   const { userData, serverUrl, setUserData, getGeminiResponse } =
-    useContext(userDataContext);
+    useContext(UserDataContext);
 
   const [listening, setListening] = useState(false);
   const [userText, setUserText] = useState("");

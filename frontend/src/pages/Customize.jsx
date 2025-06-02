@@ -11,7 +11,7 @@ import image4 from "../assets/image4.jpg";
 import image5 from "../assets/image5.png";
 import image6 from "../assets/image6.jpeg";
 import image7 from "../assets/image7.jpg";
-import { userDataContext } from "../context/UserContext";
+import { UserDataContext } from "../context/userDataContext.js";
 
 function Customize() {
   const inputImage = useRef();
@@ -22,7 +22,7 @@ function Customize() {
     setFrontendImage,
     selectedImage,
     setSelectedImage,
-  } = useContext(userDataContext);
+  } = useContext(UserDataContext);
 
   const handleImage = (e) => {
     const file = e.target.files[0];

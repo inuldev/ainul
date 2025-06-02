@@ -3,14 +3,14 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdKeyboardBackspace } from "react-icons/md";
 
-import { userDataContext } from "../context/UserContext";
+import { UserDataContext } from "../context/userDataContext.js";
 
 function Customize2() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const { userData, backendImage, selectedImage, serverUrl, setUserData } =
-    useContext(userDataContext);
+    useContext(UserDataContext);
 
   const [assistantName, setAssistantName] = useState(
     userData?.assistantName || ""
