@@ -67,15 +67,17 @@ const parseGeminiResponse = (rawResponse, originalCommand) => {
   throw new Error(`Tidak dapat mem-parse respons JSON: ${rawResponse}`);
 };
 
-// Local fallback generator
+// Enhanced intelligent local fallback generator
 const generateLocalFallback = (command) => {
   const lowerCommand = command.toLowerCase();
+  const currentTime = new Date();
 
+  // Time-related queries with actual values
   if (lowerCommand.includes("waktu") || lowerCommand.includes("jam")) {
     return {
       type: "get-time",
       userInput: command,
-      response: "Baik, saya akan memberitahu waktu saat ini",
+      response: `Sekarang jam ${moment().format("HH:mm:ss")}.`,
     };
   }
 
@@ -83,7 +85,7 @@ const generateLocalFallback = (command) => {
     return {
       type: "get-date",
       userInput: command,
-      response: "Baik, saya akan memberitahu tanggal hari ini",
+      response: `Hari ini tanggal ${moment().format("DD MMMM YYYY")}.`,
     };
   }
 
@@ -91,7 +93,7 @@ const generateLocalFallback = (command) => {
     return {
       type: "get-day",
       userInput: command,
-      response: "Baik, saya akan memberitahu hari apa sekarang",
+      response: `Hari ini adalah ${moment().format("dddd")}.`,
     };
   }
 
@@ -99,10 +101,30 @@ const generateLocalFallback = (command) => {
     return {
       type: "get-month",
       userInput: command,
-      response: "Baik, saya akan memberitahu bulan apa sekarang",
+      response: `Bulan sekarang ${moment().format("MMMM")}.`,
     };
   }
 
+  // Math calculations with basic operations
+  const mathMatch = lowerCommand.match(/(\d+)\s*[\+\-\*\/x]\s*(\d+)/);
+  if (mathMatch) {
+    try {
+      const result = eval(command.replace(/x/g, "*"));
+      return {
+        type: "general",
+        userInput: command,
+        response: `Hasil perhitungan ${command} adalah ${result}.`,
+      };
+    } catch (e) {
+      return {
+        type: "calculator-open",
+        userInput: command,
+        response: "Baik, saya akan membuka kalkulator untuk perhitungan ini.",
+      };
+    }
+  }
+
+  // Search queries with better extraction
   if (
     lowerCommand.includes("cari") &&
     (lowerCommand.includes("google") || lowerCommand.includes("search"))
@@ -110,47 +132,57 @@ const generateLocalFallback = (command) => {
     const searchTerm = command
       .replace(/.*cari/i, "")
       .replace(/di google/i, "")
+      .replace(/google/i, "")
       .trim();
     return {
       type: "google-search",
       userInput: searchTerm || command,
-      response: "Baik, saya akan mencari di Google",
+      response: `Baik, saya akan mencari "${searchTerm}" di Google.`,
     };
   }
 
-  if (lowerCommand.includes("youtube") || lowerCommand.includes("video")) {
+  if (
+    lowerCommand.includes("youtube") ||
+    lowerCommand.includes("video") ||
+    lowerCommand.includes("musik")
+  ) {
     const searchTerm = command
       .replace(/.*youtube/i, "")
       .replace(/.*video/i, "")
+      .replace(/.*musik/i, "")
+      .replace(/cari/i, "")
       .trim();
     return {
       type: "youtube-search",
       userInput: searchTerm || command,
-      response: "Baik, saya akan mencari di YouTube",
+      response: `Baik, saya akan mencari "${searchTerm}" di YouTube.`,
     };
   }
 
+  // Weather
   if (lowerCommand.includes("cuaca")) {
     return {
       type: "weather-show",
       userInput: command,
-      response: "Baik, saya akan menampilkan informasi cuaca",
+      response: "Baik, saya akan menampilkan informasi cuaca untuk Anda.",
     };
   }
 
+  // Calculator
   if (lowerCommand.includes("kalkulator") || lowerCommand.includes("hitung")) {
     return {
       type: "calculator-open",
       userInput: command,
-      response: "Baik, saya akan membuka kalkulator",
+      response: "Baik, saya akan membuka kalkulator untuk Anda.",
     };
   }
 
+  // Social media
   if (lowerCommand.includes("instagram")) {
     return {
       type: "instagram-open",
       userInput: command,
-      response: "Baik, saya akan membuka Instagram",
+      response: "Baik, saya akan membuka Instagram untuk Anda.",
     };
   }
 
@@ -158,16 +190,52 @@ const generateLocalFallback = (command) => {
     return {
       type: "facebook-open",
       userInput: command,
-      response: "Baik, saya akan membuka Facebook",
+      response: "Baik, saya akan membuka Facebook untuk Anda.",
     };
   }
 
-  // Default fallback
+  // Common greetings and responses
+  if (
+    lowerCommand.includes("halo") ||
+    lowerCommand.includes("hai") ||
+    lowerCommand.includes("hello")
+  ) {
+    return {
+      type: "general",
+      userInput: command,
+      response: "Halo! Senang bertemu dengan Anda. Ada yang bisa saya bantu?",
+    };
+  }
+
+  if (
+    lowerCommand.includes("terima kasih") ||
+    lowerCommand.includes("makasih")
+  ) {
+    return {
+      type: "general",
+      userInput: command,
+      response: "Sama-sama! Senang bisa membantu Anda.",
+    };
+  }
+
+  if (
+    lowerCommand.includes("siapa kamu") ||
+    lowerCommand.includes("siapa anda")
+  ) {
+    return {
+      type: "general",
+      userInput: command,
+      response:
+        "Saya adalah asisten virtual AI yang siap membantu Anda dengan berbagai pertanyaan dan tugas.",
+    };
+  }
+
+  // Enhanced default fallback
   return {
     type: "general",
     userInput: command,
     response:
-      "Maaf, saya tidak dapat memproses permintaan Anda saat ini. Silakan coba lagi.",
+      "Maaf, saya belum sepenuhnya memahami permintaan Anda. Bisakah Anda menjelaskan dengan cara yang berbeda?",
   };
 };
 
