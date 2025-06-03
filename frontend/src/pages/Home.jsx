@@ -33,12 +33,113 @@ function Home() {
   // State untuk greeting (hanya sekali per session)
   const [hasGreeted, setHasGreeted] = useState(false);
 
+  // Enhanced microphone states
+  const [microphoneStatus, setMicrophoneStatus] = useState("disconnected"); // disconnected, connecting, connected, error
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [microphonePermission, setMicrophonePermission] = useState("unknown"); // unknown, granted, denied
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const [microphoneQuality, setMicrophoneQuality] = useState("unknown"); // unknown, poor, good, excellent
+
   const isSpeakingRef = useRef(false);
   const isRecognizingRef = useRef(false);
   const recognitionRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
   const retryCountRef = useRef(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const microphoneStreamRef = useRef(null);
   const synth = window.speechSynthesis;
+
+  // Enhanced microphone monitoring and audio level detection
+  const initializeMicrophone = useCallback(async () => {
+    try {
+      setMicrophoneStatus("connecting");
+
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100,
+        },
+      });
+
+      microphoneStreamRef.current = stream;
+      setMicrophonePermission("granted");
+      setMicrophoneStatus("connected");
+
+      // Initialize audio context for level monitoring
+      const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      microphone.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      // Start monitoring audio levels
+      monitorAudioLevel();
+
+      console.log("Microphone initialized successfully");
+      return true;
+    } catch (error) {
+      console.error("Microphone initialization failed:", error);
+      setMicrophoneStatus("error");
+
+      if (error.name === "NotAllowedError") {
+        setMicrophonePermission("denied");
+        setErrorMessage(
+          "Akses mikrofon ditolak. Silakan izinkan akses mikrofon di pengaturan browser."
+        );
+      } else if (error.name === "NotFoundError") {
+        setErrorMessage(
+          "Mikrofon tidak ditemukan. Pastikan mikrofon terhubung."
+        );
+      } else {
+        setErrorMessage("Gagal mengakses mikrofon. Coba refresh halaman.");
+      }
+      return false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Monitor audio level for visual feedback
+  const monitorAudioLevel = useCallback(() => {
+    if (!analyserRef.current) return;
+
+    const analyser = analyserRef.current;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const updateLevel = () => {
+      if (!analyserRef.current) return;
+
+      analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const normalizedLevel = Math.min(100, (average / 128) * 100);
+
+      setAudioLevel(normalizedLevel);
+
+      // Determine microphone quality based on audio level patterns
+      if (normalizedLevel > 50) {
+        setMicrophoneQuality("excellent");
+      } else if (normalizedLevel > 20) {
+        setMicrophoneQuality("good");
+      } else if (normalizedLevel > 5) {
+        setMicrophoneQuality("poor");
+      } else {
+        setMicrophoneQuality("unknown");
+      }
+
+      requestAnimationFrame(updateLevel);
+    };
+
+    updateLevel();
+  }, []);
 
   // Enhanced network status monitoring
   useEffect(() => {
@@ -57,7 +158,7 @@ function Home() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("online", handleOffline);
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
@@ -75,11 +176,33 @@ function Home() {
     }
   };
 
-  // Start recognition manually
-  const startRecognition = useCallback(() => {
+  // Enhanced start recognition with microphone check
+  const startRecognition = useCallback(async () => {
     if (!isOnline) {
       setErrorMessage(
         "Tidak dapat memulai pengenalan suara tanpa koneksi internet"
+      );
+      return;
+    }
+
+    // Check microphone status first
+    if (microphoneStatus === "disconnected" || microphoneStatus === "error") {
+      console.log("Initializing microphone...");
+      const micInitialized = await initializeMicrophone();
+      if (!micInitialized) {
+        setFallbackMode(true);
+        setErrorMessage(
+          "Mikrofon tidak tersedia. Gunakan input manual di bawah."
+        );
+        return;
+      }
+    }
+
+    // Check microphone permission
+    if (microphonePermission === "denied") {
+      setFallbackMode(true);
+      setErrorMessage(
+        "Akses mikrofon ditolak. Gunakan input manual atau izinkan akses mikrofon."
       );
       return;
     }
@@ -89,7 +212,8 @@ function Home() {
         recognitionRef.current.start();
         setListening(true);
         setErrorMessage("");
-        console.log("Manual recognition start");
+        setFallbackMode(false);
+        console.log("Enhanced recognition started");
       }
     } catch (error) {
       if (
@@ -97,10 +221,13 @@ function Home() {
         !error.message.includes("already")
       ) {
         console.error("Recognition error: ", error);
-        setErrorMessage("Gagal memulai pengenalan suara");
+        setErrorMessage(
+          "Gagal memulai pengenalan suara. Coba gunakan input manual."
+        );
+        setFallbackMode(true);
       }
     }
-  }, [isOnline]);
+  }, [isOnline, microphoneStatus, microphonePermission, initializeMicrophone]);
 
   // Stop recognition manually
   const stopRecognition = useCallback(() => {
@@ -994,6 +1121,103 @@ function Home() {
               <span className="text-xs text-gray-300">Processing</span>
             </div>
           )}
+        </div>
+
+        {/* Enhanced Microphone Status Display */}
+        <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-3 mb-4 max-w-sm">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-300 text-sm font-medium">
+                Status Mikrofon
+              </span>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    microphoneStatus === "connected"
+                      ? "bg-green-500"
+                      : microphoneStatus === "connecting"
+                      ? "bg-yellow-500 animate-pulse"
+                      : microphoneStatus === "error"
+                      ? "bg-red-500"
+                      : "bg-gray-500"
+                  }`}
+                ></div>
+                <span
+                  className={`text-xs ${
+                    microphoneStatus === "connected"
+                      ? "text-green-400"
+                      : microphoneStatus === "connecting"
+                      ? "text-yellow-400"
+                      : microphoneStatus === "error"
+                      ? "text-red-400"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {microphoneStatus === "connected"
+                    ? "Terhubung"
+                    : microphoneStatus === "connecting"
+                    ? "Menghubungkan..."
+                    : microphoneStatus === "error"
+                    ? "Error"
+                    : "Terputus"}
+                </span>
+              </div>
+            </div>
+
+            {/* Audio Level Indicator */}
+            {microphoneStatus === "connected" && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Level Audio</span>
+                  <span
+                    className={`text-xs ${
+                      microphoneQuality === "excellent"
+                        ? "text-green-400"
+                        : microphoneQuality === "good"
+                        ? "text-blue-400"
+                        : microphoneQuality === "poor"
+                        ? "text-yellow-400"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {microphoneQuality === "excellent"
+                      ? "Sangat Baik"
+                      : microphoneQuality === "good"
+                      ? "Baik"
+                      : microphoneQuality === "poor"
+                      ? "Kurang"
+                      : "Tidak Diketahui"}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-200 ${
+                      audioLevel > 50
+                        ? "bg-green-500"
+                        : audioLevel > 20
+                        ? "bg-blue-500"
+                        : audioLevel > 5
+                        ? "bg-yellow-500"
+                        : "bg-gray-500"
+                    }`}
+                    style={{ width: `${Math.min(audioLevel, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback Mode Indicator */}
+            {fallbackMode && (
+              <div className="bg-yellow-500/20 border border-yellow-500 rounded p-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-400 text-xs">⚠️</span>
+                  <span className="text-yellow-300 text-xs">
+                    Mode Manual Aktif
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error Message Display */}
